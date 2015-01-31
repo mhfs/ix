@@ -75,7 +75,7 @@ func main() {
 			panic("invalid date provided")
 		}
 
-		fmt.Printf("Starting work for repo '%s' since '%s'\n", repo, since.Format(dateFormat))
+		fmt.Printf("Starting work for repo '%s' since '%s'\n\n", repo, since.Format(dateFormat))
 
 		parts := strings.Split(repo, "/")
 		issues, err := fetchIssues(parts[0], parts[1], since)
@@ -99,7 +99,7 @@ func fetchIssues(owner string, repo string, since time.Time) ([]github.Issue, er
 
 	client := github.NewClient(t.Client())
 
-	options := github.IssueListByRepoOptions{State: "closed", Sort: "updated", Since: since}
+	options := github.IssueListByRepoOptions{State: "closed", Sort: "created", Since: since}
 	issues, _, err := client.Issues.ListByRepo(owner, repo, &options)
 
 	return issues, err
@@ -113,8 +113,13 @@ func printIssue(issue *github.Issue) {
 
 func beginningOfWeek() time.Time {
 	now := time.Now()
+	// truncate internal HH:MM:SS to zero and compensate for local zone offset
+	// 2015-01-31 10:45:54.720292964 -0800 PST > 2015-01-30 16:00:00 -0800 PST > 2015-01-31 00:00:00 -0800 PST
 	_, offset := now.Zone()
 	beginningOfDay := now.Truncate(24 * time.Hour).Add(-1 * time.Duration(offset) * time.Second)
-	weekFirstDay := beginningOfDay.Add(-time.Duration(now.Weekday()) * 24 * time.Hour)
-	return weekFirstDay
+
+	// subtract days to get to sunday
+	beginningOfWeek := beginningOfDay.Add(-time.Duration(now.Weekday()) * 24 * time.Hour)
+
+	return beginningOfWeek
 }
