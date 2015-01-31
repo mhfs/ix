@@ -89,15 +89,22 @@ func main() {
 			}
 
 			for _, event := range events {
+				// events are ordered by created at desc. stop if got all we wanted.
+				if event.CreatedAt.Before(since) {
+					finished = true
+					break
+				}
+
 				// if event is closed or issue didn't remain closed
 				if *event.Event != "closed" || *event.Issue.State != "closed" {
 					continue
 				}
 
-				// events are ordered by created at desc. stop if got all we wanted.
-				if event.CreatedAt.Before(since) {
-					finished = true
-					break
+				// if label filtering set, skip labels we're not interested at
+				if labels := ctx.StringSlice("label"); len(labels) > 0 {
+					if !matchingLabels(event.Issue.Labels, labels) {
+						continue
+					}
 				}
 
 				printEvent(&event)
@@ -128,12 +135,22 @@ func printEvent(event *github.IssueEvent) {
 
 	var assignee string
 	if event.Issue.Assignee != nil {
-		assignee = "@" + *event.Issue.Assignee.Login
-	} else {
-		assignee = "unknown"
+		assignee = " by @" + *event.Issue.Assignee.Login
 	}
 
-	fmt.Printf("#%d - %s - %s (%s)\n", *number, closedAt, *title, assignee)
+	var labelsNames []string
+	if labels := event.Issue.Labels; len(labels) > 0 {
+		for _, l := range labels {
+			labelsNames = append(labelsNames, *l.Name)
+		}
+	}
+	labelsString := strings.Join(labelsNames, ", ")
+
+	if len(labelsString) > 0 {
+		labelsString = " (" + labelsString + ")"
+	}
+
+	fmt.Printf("#%d - %s - %s%s%s\n", *number, closedAt, *title, assignee, labelsString)
 }
 
 func beginningOfWeek() time.Time {
@@ -147,4 +164,15 @@ func beginningOfWeek() time.Time {
 	beginningOfWeek := beginningOfDay.Add(-time.Duration(now.Weekday()) * 24 * time.Hour)
 
 	return beginningOfWeek
+}
+
+func matchingLabels(issueLabels []github.Label, targetLabels []string) bool {
+	for _, issueLabel := range issueLabels {
+		for _, targetLabel := range targetLabels {
+			if *issueLabel.Name == targetLabel {
+				return true
+			}
+		}
+	}
+	return false
 }
