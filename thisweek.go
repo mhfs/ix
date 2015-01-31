@@ -11,13 +11,17 @@ import (
 	"github.com/google/go-github/github"
 )
 
+const (
+	dateFormat = "2006-01-02"
+)
+
 func init() {
 	cli.AppHelpTemplate = `NAME:
    {{.Name}} - {{.Usage}}
 
 USAGE:
    {{.Name}} {{if .Flags}}[options] {{end}}
-
+"
 VERSION:
    {{.Version}}{{if or .Author .Email}}
 
@@ -46,14 +50,9 @@ func main() {
 			Usage: "GitHub repository to analyze e.g. mhfs/thisweek",
 		},
 		cli.StringFlag{
-			Name: "from, f",
-			// Value: "2015-01-25", // FIXME make default beginning of current week
-			Usage: "from date, inclusive",
-		},
-		cli.StringFlag{
-			Name: "to, t",
-			// Value: "2015-01-31", // FIXME make default end of current week
-			Usage: "to date, inclusive",
+			Name:  "since, s",
+			Value: utcBeginningOfWeekFromLocal().In(time.Local).Format(dateFormat),
+			Usage: "list issues since given date, inclusive",
 		},
 		cli.StringSliceFlag{
 			Name:  "label, l",
@@ -71,10 +70,15 @@ func main() {
 			return
 		}
 
-		fmt.Printf("Starting Processing for repo '%s'\n", repo)
+		since, err := time.ParseInLocation(dateFormat, ctx.String("since"), time.Local)
+		if err != nil {
+			panic("invalid date provided")
+		}
+
+		fmt.Printf("Starting work for repo '%s' since '%s'\n", repo, since.Format(dateFormat))
 
 		parts := strings.Split(repo, "/")
-		issues, err := loadIssues(parts[0], parts[1])
+		issues, err := fetchIssues(parts[0], parts[1], since)
 
 		if err != nil {
 			panic(err) // FIXME be smarter. handle 404s, 403s, ...
@@ -88,20 +92,14 @@ func main() {
 	app.Run(os.Args)
 }
 
-func loadIssues(owner string, repo string) ([]github.Issue, error) {
+func fetchIssues(owner string, repo string, since time.Time) ([]github.Issue, error) {
 	t := &oauth.Transport{
 		Token: &oauth.Token{AccessToken: os.Getenv("GH_TOKEN")},
 	}
 
 	client := github.NewClient(t.Client())
 
-	from, err := time.Parse("2006-01-02", "2015-01-25")
-
-	if err != nil {
-		panic("invalid date provided")
-	}
-
-	options := github.IssueListByRepoOptions{State: "closed", Sort: "updated", Since: from}
+	options := github.IssueListByRepoOptions{State: "closed", Sort: "updated", Since: since}
 	issues, _, err := client.Issues.ListByRepo(owner, repo, &options)
 
 	return issues, err
@@ -110,5 +108,13 @@ func loadIssues(owner string, repo string) ([]github.Issue, error) {
 func printIssue(issue *github.Issue) {
 	// TODO handle nils and missing assignee
 	// fmt.Printf("#%d %s %s (%s)", issue.Number, issue.ClosedAt, issue.Title, issue.Assignee.Login)
-	fmt.Printf("#%d - %s - %s\n", *issue.Number, issue.ClosedAt, *issue.Title)
+	fmt.Printf("#%d - %s - %s\n", *issue.Number, issue.ClosedAt.Format(dateFormat), *issue.Title)
+}
+
+func utcBeginningOfWeekFromLocal() time.Time {
+	now := time.Now()
+	_, offset := now.Zone()
+	beginningOfDay := now.UTC().Truncate(24 * time.Hour).Add(-1 * time.Duration(offset) * time.Second)
+	weekFirstDay := beginningOfDay.Add(-time.Duration(now.Weekday()) * 24 * time.Hour)
+	return weekFirstDay
 }
