@@ -78,38 +78,44 @@ func main() {
 		fmt.Printf("Starting work for repo '%s' since '%s'\n\n", repo, since.Format(dateFormat))
 
 		parts := strings.Split(repo, "/")
-		events, err := fetchEvents(parts[0], parts[1], since)
+		owner, repo := parts[0], parts[1]
 
-		if err != nil {
-			panic(err) // FIXME be smarter. handle 404s, 403s, ...
-		}
+		var finished bool
+		for page := 1; !finished; page++ {
+			events, err := fetchEvents(owner, repo, page)
 
-		for _, event := range events {
-			// if event is closed or issue didn't remain closed
-			if *event.Event != "closed" || *event.Issue.State != "closed" {
-				continue
+			if err != nil {
+				panic(err) // FIXME be smarter. handle 404s, 403s, ...
 			}
 
-			// events are ordered by created at desc. stop if got all we wanted.
-			if event.CreatedAt.Before(since) {
-				break
-			}
+			for _, event := range events {
+				// if event is closed or issue didn't remain closed
+				if *event.Event != "closed" || *event.Issue.State != "closed" {
+					continue
+				}
 
-			printEvent(&event)
+				// events are ordered by created at desc. stop if got all we wanted.
+				if event.CreatedAt.Before(since) {
+					finished = true
+					break
+				}
+
+				printEvent(&event)
+			}
 		}
 	}
 
 	app.Run(os.Args)
 }
 
-func fetchEvents(owner string, repo string, since time.Time) ([]github.IssueEvent, error) {
+func fetchEvents(owner string, repo string, page int) ([]github.IssueEvent, error) {
 	t := &oauth.Transport{
 		Token: &oauth.Token{AccessToken: os.Getenv("GH_TOKEN")},
 	}
 
 	client := github.NewClient(t.Client())
 
-	options := github.ListOptions{Page: 1, PerPage: 100}
+	options := github.ListOptions{Page: page, PerPage: 100}
 	events, _, err := client.Issues.ListRepositoryEvents(owner, repo, &options)
 
 	return events, err
