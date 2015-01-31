@@ -78,37 +78,56 @@ func main() {
 		fmt.Printf("Starting work for repo '%s' since '%s'\n\n", repo, since.Format(dateFormat))
 
 		parts := strings.Split(repo, "/")
-		issues, err := fetchIssues(parts[0], parts[1], since)
+		events, err := fetchEvents(parts[0], parts[1], since)
 
 		if err != nil {
 			panic(err) // FIXME be smarter. handle 404s, 403s, ...
 		}
 
-		for _, issue := range issues {
-			printIssue(&issue)
+		for _, event := range events {
+			// if event is closed or issue didn't remain closed
+			if *event.Event != "closed" || *event.Issue.State != "closed" {
+				continue
+			}
+
+			// events are ordered by created at desc. stop if got all we wanted.
+			if event.CreatedAt.Before(since) {
+				break
+			}
+
+			printEvent(&event)
 		}
 	}
 
 	app.Run(os.Args)
 }
 
-func fetchIssues(owner string, repo string, since time.Time) ([]github.Issue, error) {
+func fetchEvents(owner string, repo string, since time.Time) ([]github.IssueEvent, error) {
 	t := &oauth.Transport{
 		Token: &oauth.Token{AccessToken: os.Getenv("GH_TOKEN")},
 	}
 
 	client := github.NewClient(t.Client())
 
-	options := github.IssueListByRepoOptions{State: "closed", Sort: "created", Since: since}
-	issues, _, err := client.Issues.ListByRepo(owner, repo, &options)
+	options := github.ListOptions{Page: 1, PerPage: 100}
+	events, _, err := client.Issues.ListRepositoryEvents(owner, repo, &options)
 
-	return issues, err
+	return events, err
 }
 
-func printIssue(issue *github.Issue) {
-	// TODO handle nils and missing assignee
-	// fmt.Printf("#%d %s %s (%s)", issue.Number, issue.ClosedAt, issue.Title, issue.Assignee.Login)
-	fmt.Printf("#%d - %s - %s\n", *issue.Number, issue.ClosedAt.Format(dateFormat), *issue.Title)
+func printEvent(event *github.IssueEvent) {
+	number := event.Issue.Number
+	closedAt := event.Issue.ClosedAt.In(time.Local).Format(dateFormat)
+	title := event.Issue.Title
+
+	var assignee string
+	if event.Issue.Assignee != nil {
+		assignee = "@" + *event.Issue.Assignee.Login
+	} else {
+		assignee = "unknown"
+	}
+
+	fmt.Printf("#%d - %s - %s (%s)\n", *number, closedAt, *title, assignee)
 }
 
 func beginningOfWeek() time.Time {
