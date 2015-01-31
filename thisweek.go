@@ -51,7 +51,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "since, s",
-			Value: utcBeginningOfWeekFromLocal().In(time.Local).Format(dateFormat),
+			Value: beginningOfWeek().In(time.Local).Format(dateFormat),
 			Usage: "list issues since given date, inclusive",
 		},
 		cli.StringSliceFlag{
@@ -111,10 +111,10 @@ func printIssue(issue *github.Issue) {
 	fmt.Printf("#%d - %s - %s\n", *issue.Number, issue.ClosedAt.Format(dateFormat), *issue.Title)
 }
 
-func utcBeginningOfWeekFromLocal() time.Time {
+func beginningOfWeek() time.Time {
 	now := time.Now()
 	_, offset := now.Zone()
-	beginningOfDay := now.UTC().Truncate(24 * time.Hour).Add(-1 * time.Duration(offset) * time.Second)
+	beginningOfDay := now.Truncate(24 * time.Hour).Add(-1 * time.Duration(offset) * time.Second)
 	weekFirstDay := beginningOfDay.Add(-time.Duration(now.Weekday()) * 24 * time.Hour)
 	return weekFirstDay
 }
