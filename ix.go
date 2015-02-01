@@ -22,7 +22,12 @@ func init() {
 
 USAGE:
    {{.Name}} {{if .Flags}}[options] {{end}}
-"
+
+EXAMPLES:
+   {{.Name}} --repo mhfs/ix --since 2015-01-01
+   {{.Name}} --repo mhfs/ix --assignee mhfs
+   {{.Name}} --repo mhfs/ix --label bug
+
 VERSION:
    {{.Version}}{{if or .Author .Email}}
 
