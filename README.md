@@ -20,6 +20,13 @@ go install
 $GOPATH/bin/ix help
 ```
 
+## Authentication
+
+ix depends on a oauth token from GitHub. You can provide it via a `--token`/`-t` options or set a
+`GH_TOKEN` environment variable.
+
+To generate a new token, go to https://github.com/settings/applications.
+
 ## Usage
 
 ```
