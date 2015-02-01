@@ -1,9 +1,9 @@
 # ix - Issues Explorer
 
-CLI tool to explore closed GitHub issue for a repository by time frame, labels and assignee.
+CLI tool to explore GitHub issues by repository, time frame, labels and assignee.
 
 ```
-$ ix -repo mhfs/ix -t <GH_TOKEN>
+$ ix closed --repo mhfs/ix --token <GH_TOKEN>
 
 #1 - 2015-01-29 - Fixed that weird bug by @mhfs (labe1, label2)
 #2 - 2015-01-27 - Added another amazing feature by @mhfs
@@ -31,15 +31,10 @@ To generate a new token, go to https://github.com/settings/applications.
 
 ```
 NAME:
-   ix - cli to explore closed GitHub issue for a repository by time frame, labels and assignee
+   ix - Issues Explorer - CLI tool to explore GitHub issues by repository, time frame, labels and assignee.
 
 USAGE:
-   ix [options]
-
-EXAMPLES:
-   ix --repo mhfs/ix --since 2015-01-01
-   ix --repo mhfs/ix --assignee mhfs
-   ix --repo mhfs/ix --label bug
+   ix [global options] command [command options] [arguments...]
 
 VERSION:
    0.0.1
@@ -47,14 +42,21 @@ VERSION:
 AUTHOR:
   Marcelo Silveira - <marcelo@mhfs.com.br>
 
-OPTIONS:
-   --repo, -r 					GitHub repository to analyze e.g. mhfs/ix
-   --since, -s '2015-01-26'			list issues since given date, inclusive
-   --label, -l '--label option --label option'	label to process, defaults to all
-   --assignee, -a 				filter results by assignee
-   --token, -t 					oauth token. defaults to GH_TOKEN env var. [$GH_TOKEN]
-   --help, -h					show help
-   --version, -v				print the version
+COMMANDS:
+   closed, c	lists closed issues
+   help, h	Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --help, -h		show help
+   --version, -v	print the version
+```
+
+## Examples
+
+```
+ix closed --repo mhfs/ix --since 2015-01-01
+ix closed --repo mhfs/ix --assignee mhfs
+ix closed --repo mhfs/ix --label bug
 ```
 
 ## License

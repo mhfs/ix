@@ -16,82 +16,63 @@ const (
 	dateFormat = "2006-01-02"
 )
 
-func init() {
-	cli.AppHelpTemplate = `NAME:
-   {{.Name}} - {{.Usage}}
-
-USAGE:
-   {{.Name}} {{if .Flags}}[options] {{end}}
-
-EXAMPLES:
-   {{.Name}} --repo mhfs/ix --since 2015-01-01
-   {{.Name}} --repo mhfs/ix --assignee mhfs
-   {{.Name}} --repo mhfs/ix --label bug
-
-VERSION:
-   {{.Version}}{{if or .Author .Email}}
-
-AUTHOR:{{if .Author}}
-  {{.Author}}{{if .Email}} - <{{.Email}}>{{end}}{{else}}
-  {{.Email}}{{end}}{{end}}{{if .Flags}}
-
-OPTIONS:
-   {{range .Flags}}{{.}}
-   {{end}}{{end}}
-`
-}
-
 func main() {
 	app := cli.NewApp()
 	app.Name = "ix"
-	app.Usage = "cli to explore closed GitHub issue for a repository by time frame, labels and assignee"
+	app.Usage = "Issues Explorer - CLI tool to explore GitHub issues by repository, time frame, labels and assignee."
 	app.Version = "0.0.1"
 	app.Author = "Marcelo Silveira"
 	app.Email = "marcelo@mhfs.com.br"
 
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "repo, r",
-			Value: "",
-			Usage: "GitHub repository to analyze e.g. mhfs/ix",
-		},
-		cli.StringFlag{
-			Name:  "since, s",
-			Value: beginningOfWeek().In(time.Local).Format(dateFormat),
-			Usage: "list issues since given date, inclusive",
-		},
-		cli.StringSliceFlag{
-			Name:  "label, l",
-			Value: &cli.StringSlice{},
-			Usage: "label to process, defaults to all",
-		},
-		cli.StringFlag{
-			Name:  "assignee, a",
-			Value: "",
-			Usage: "filter results by assignee",
-		},
-		cli.StringFlag{
-			Name:   "token, t",
-			Value:  "",
-			Usage:  "oauth token. defaults to GH_TOKEN env var.",
-			EnvVar: "GH_TOKEN",
+	app.Commands = []cli.Command{
+		{
+			Name:      "closed",
+			ShortName: "c",
+			Usage:     "lists closed issues",
+			Action:    closedCommand,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "repo, r",
+					Value: "",
+					Usage: "GitHub repository to analyze e.g. mhfs/ix",
+				},
+				cli.StringFlag{
+					Name:  "since, s",
+					Value: beginningOfWeek().In(time.Local).Format(dateFormat),
+					Usage: "list issues since given date, inclusive",
+				},
+				cli.StringSliceFlag{
+					Name:  "label, l",
+					Value: &cli.StringSlice{},
+					Usage: "label to process, defaults to all",
+				},
+				cli.StringFlag{
+					Name:  "assignee, a",
+					Value: "",
+					Usage: "filter results by assignee",
+				},
+				cli.StringFlag{
+					Name:   "token, t",
+					Value:  "",
+					Usage:  "oauth token. defaults to GH_TOKEN env var.",
+					EnvVar: "GH_TOKEN",
+				},
+			},
 		},
 	}
-
-	app.Action = mainCommand
 
 	app.Run(os.Args)
 }
 
-func mainCommand(ctx *cli.Context) {
+func closedCommand(ctx *cli.Context) {
 	repo := ctx.String("repo")
 	assignee := ctx.String("assignee")
 	labels := ctx.StringSlice("label")
 	token := ctx.String("token")
 
 	if repo == "" {
-		fmt.Println("\n***** Missing required flag --repo *****\n")
-		cli.ShowAppHelp(ctx)
+		fmt.Println("\nMissing required flag --repo. Check usage below.\n\n")
+		cli.ShowCommandHelp(ctx, ctx.Command.Name)
 		return
 	}
 
