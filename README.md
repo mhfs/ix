@@ -1,4 +1,4 @@
-# ix
+# ix - Issues Explorer
 
 CLI tool to explore closed GitHub issue for a repository by time frame, labels and assignee.
 
