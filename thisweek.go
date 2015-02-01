@@ -84,23 +84,23 @@ func mainCommand(ctx *cli.Context) {
 	labels := ctx.StringSlice("label")
 	token := ctx.String("token")
 
-	t := &oauth.Transport{
-		Token: &oauth.Token{AccessToken: token},
-	}
-	client := t.Client()
-
 	if repo == "" {
 		fmt.Println("\n***** Missing required flag --repo *****\n")
 		cli.ShowAppHelp(ctx)
 		return
 	}
 
+	t := &oauth.Transport{
+		Token: &oauth.Token{AccessToken: token},
+	}
+	client := t.Client()
+
 	since, err := time.ParseInLocation(dateFormat, ctx.String("since"), time.Local)
 	if err != nil {
 		panic("invalid date provided")
 	}
 
-	fmt.Printf("Starting work for repo '%s' since '%s'\n\n", repo, since.Format(dateFormat))
+	fmt.Printf("Analyzing repo '%s' since '%s'\n\n", repo, since.Format(dateFormat))
 
 	parts := strings.Split(repo, "/")
 	owner, repo := parts[0], parts[1]
