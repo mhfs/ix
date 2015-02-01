@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -64,11 +65,21 @@ func main() {
 			Value: "",
 			Usage: "filter results to a single user",
 		},
+		cli.StringFlag{
+			Name:   "token, t",
+			Value:  "",
+			Usage:  "oauth token. defaults to GH_TOKEN env var.",
+			EnvVar: "GH_TOKEN",
+		},
 	}
 
 	app.Action = func(ctx *cli.Context) {
 		repo := ctx.String("repo")
 		user := ctx.String("user")
+		t := &oauth.Transport{
+			Token: &oauth.Token{AccessToken: ctx.String("token")},
+		}
+		client := t.Client()
 
 		if repo == "" {
 			fmt.Println("\n***** Missing required flag --repo *****\n")
@@ -88,10 +99,11 @@ func main() {
 
 		var finished bool
 		for page := 1; !finished; page++ {
-			events, err := fetchEvents(owner, repo, page)
+			events, err := fetchEvents(client, owner, repo, page)
 
 			if err != nil {
-				panic(err) // FIXME be smarter. handle 404s, 403s, ...
+				fmt.Printf("Couldn't fetch issue from GitHub. Error: '%s'\n", err)
+				os.Exit(1)
 			}
 
 			for _, event := range events {
@@ -125,12 +137,8 @@ func main() {
 	app.Run(os.Args)
 }
 
-func fetchEvents(owner string, repo string, page int) ([]github.IssueEvent, error) {
-	t := &oauth.Transport{
-		Token: &oauth.Token{AccessToken: os.Getenv("GH_TOKEN")},
-	}
-
-	client := github.NewClient(t.Client())
+func fetchEvents(httpClient *http.Client, owner string, repo string, page int) ([]github.IssueEvent, error) {
+	client := github.NewClient(httpClient)
 
 	options := github.ListOptions{Page: page, PerPage: 100}
 	events, _, err := client.Issues.ListRepositoryEvents(owner, repo, &options)
