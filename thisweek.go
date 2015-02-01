@@ -59,10 +59,16 @@ func main() {
 			Value: &cli.StringSlice{},
 			Usage: "label to process, defaults to all",
 		},
+		cli.StringFlag{
+			Name:  "user, u",
+			Value: "",
+			Usage: "filter results to a single user",
+		},
 	}
 
 	app.Action = func(ctx *cli.Context) {
 		repo := ctx.String("repo")
+		user := ctx.String("user")
 
 		if repo == "" {
 			fmt.Println("\n***** Missing required flag --repo *****\n")
@@ -97,6 +103,10 @@ func main() {
 
 				// if event is closed or issue didn't remain closed
 				if *event.Event != "closed" || *event.Issue.State != "closed" {
+					continue
+				}
+
+				if len(user) > 0 && (event.Issue.Assignee == nil || user != *event.Issue.Assignee.Login) {
 					continue
 				}
 
