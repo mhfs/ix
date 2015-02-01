@@ -71,7 +71,7 @@ func closedCommand(ctx *cli.Context) {
 	token := ctx.String("token")
 
 	if repo == "" {
-		fmt.Println("\nMissing required flag --repo. Check usage below.\n\n")
+		fmt.Print("\nMissing required flag --repo. Check usage below.\n\n")
 		cli.ShowCommandHelp(ctx, ctx.Command.Name)
 		return
 	}
