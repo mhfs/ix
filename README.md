@@ -9,9 +9,9 @@ $ ix -repo mhfs/ix -t <GH_TOKEN>
 #2 - 2015-01-27 - Added another amazing feature by @mhfs
 ```
 
-## Install
+## Installation
 
-Only available from source at the moment. Binaries releases planned for future versions.
+Only available from source at the moment. Binary releases planned for future versions.
 
 ```
 go get github.com/mhfs/ix
