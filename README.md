@@ -51,6 +51,23 @@ GLOBAL OPTIONS:
    --version, -v	print the version
 ```
 
+### `closed`
+
+```
+NAME:
+   closed - lists closed issues
+
+USAGE:
+   command closed [command options] [arguments...]
+
+OPTIONS:
+   --repo, -r 					GitHub repository to analyze e.g. mhfs/ix
+   --since, -s '2015-01-26'			list issues since given date, inclusive
+   --label, -l '--label option --label option'	label to process, defaults to all
+   --assignee, -a 				filter results by assignee
+   --token, -t 					oauth token. defaults to GH_TOKEN env var. [$GH_TOKEN]
+```
+
 ## Examples
 
 ```
