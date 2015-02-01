@@ -73,68 +73,49 @@ func main() {
 		},
 	}
 
-	app.Action = func(ctx *cli.Context) {
-		repo := ctx.String("repo")
-		user := ctx.String("user")
-		t := &oauth.Transport{
-			Token: &oauth.Token{AccessToken: ctx.String("token")},
-		}
-		client := t.Client()
-
-		if repo == "" {
-			fmt.Println("\n***** Missing required flag --repo *****\n")
-			cli.ShowAppHelp(ctx)
-			return
-		}
-
-		since, err := time.ParseInLocation(dateFormat, ctx.String("since"), time.Local)
-		if err != nil {
-			panic("invalid date provided")
-		}
-
-		fmt.Printf("Starting work for repo '%s' since '%s'\n\n", repo, since.Format(dateFormat))
-
-		parts := strings.Split(repo, "/")
-		owner, repo := parts[0], parts[1]
-
-		var finished bool
-		for page := 1; !finished; page++ {
-			events, err := fetchEvents(client, owner, repo, page)
-
-			if err != nil {
-				fmt.Printf("Couldn't fetch issue from GitHub. Error: '%s'\n", err)
-				os.Exit(1)
-			}
-
-			for _, event := range events {
-				// events are ordered by created at desc. stop if got all we wanted.
-				if event.CreatedAt.Before(since) {
-					finished = true
-					break
-				}
-
-				// if event is closed or issue didn't remain closed
-				if *event.Event != "closed" || *event.Issue.State != "closed" {
-					continue
-				}
-
-				if len(user) > 0 && (event.Issue.Assignee == nil || user != *event.Issue.Assignee.Login) {
-					continue
-				}
-
-				// if label filtering set, skip labels we're not interested at
-				if labels := ctx.StringSlice("label"); len(labels) > 0 {
-					if !matchingLabels(event.Issue.Labels, labels) {
-						continue
-					}
-				}
-
-				printEvent(&event)
-			}
-		}
-	}
+	app.Action = mainCommand
 
 	app.Run(os.Args)
+}
+
+func mainCommand(ctx *cli.Context) {
+	repo := ctx.String("repo")
+	user := ctx.String("user")
+	labels := ctx.StringSlice("label")
+	token := ctx.String("token")
+
+	t := &oauth.Transport{
+		Token: &oauth.Token{AccessToken: token},
+	}
+	client := t.Client()
+
+	if repo == "" {
+		fmt.Println("\n***** Missing required flag --repo *****\n")
+		cli.ShowAppHelp(ctx)
+		return
+	}
+
+	since, err := time.ParseInLocation(dateFormat, ctx.String("since"), time.Local)
+	if err != nil {
+		panic("invalid date provided")
+	}
+
+	fmt.Printf("Starting work for repo '%s' since '%s'\n\n", repo, since.Format(dateFormat))
+
+	parts := strings.Split(repo, "/")
+	owner, repo := parts[0], parts[1]
+
+	var done bool
+	for page := 1; !done; page++ {
+		events, err := fetchEvents(client, owner, repo, page)
+
+		if err != nil {
+			fmt.Printf("Couldn't fetch issue from GitHub. Error: '%s'\n", err)
+			os.Exit(1)
+		}
+
+		done = printEvents(events, since, labels, user)
+	}
 }
 
 func fetchEvents(httpClient *http.Client, owner string, repo string, page int) ([]github.IssueEvent, error) {
@@ -144,6 +125,35 @@ func fetchEvents(httpClient *http.Client, owner string, repo string, page int) (
 	events, _, err := client.Issues.ListRepositoryEvents(owner, repo, &options)
 
 	return events, err
+}
+
+func printEvents(events []github.IssueEvent, since time.Time, labels []string, user string) bool {
+	for _, event := range events {
+		// events are ordered by created at desc. stop if got all we wanted.
+		if event.CreatedAt.Before(since) {
+			return true
+		}
+
+		// if event is closed or issue didn't remain closed
+		if *event.Event != "closed" || *event.Issue.State != "closed" {
+			continue
+		}
+
+		if len(user) > 0 && (event.Issue.Assignee == nil || user != *event.Issue.Assignee.Login) {
+			continue
+		}
+
+		// if label filtering set, skip labels we're not interested at
+		if len(labels) > 0 {
+			if !matchingLabels(event.Issue.Labels, labels) {
+				continue
+			}
+		}
+
+		printEvent(&event)
+	}
+
+	return false
 }
 
 func printEvent(event *github.IssueEvent) {
