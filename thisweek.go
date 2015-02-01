@@ -38,8 +38,8 @@ OPTIONS:
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "thisweek"
-	app.Usage = "create a report of your team's activity this week (or for whenever you'd like)"
+	app.Name = "ix"
+	app.Usage = "cli to explore closed GitHub issue for a repository by time frame, labels and assignee"
 	app.Version = "0.0.1"
 	app.Author = "Marcelo Silveira"
 	app.Email = "marcelo@mhfs.com.br"
@@ -48,7 +48,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "repo, r",
 			Value: "",
-			Usage: "GitHub repository to analyze e.g. mhfs/thisweek",
+			Usage: "GitHub repository to analyze e.g. mhfs/ix",
 		},
 		cli.StringFlag{
 			Name:  "since, s",
@@ -61,9 +61,9 @@ func main() {
 			Usage: "label to process, defaults to all",
 		},
 		cli.StringFlag{
-			Name:  "user, u",
+			Name:  "assignee, a",
 			Value: "",
-			Usage: "filter results to a single user",
+			Usage: "filter results by assignee",
 		},
 		cli.StringFlag{
 			Name:   "token, t",
@@ -80,7 +80,7 @@ func main() {
 
 func mainCommand(ctx *cli.Context) {
 	repo := ctx.String("repo")
-	user := ctx.String("user")
+	assignee := ctx.String("assignee")
 	labels := ctx.StringSlice("label")
 	token := ctx.String("token")
 
@@ -114,7 +114,7 @@ func mainCommand(ctx *cli.Context) {
 			os.Exit(1)
 		}
 
-		done = printEvents(events, since, labels, user)
+		done = printEvents(events, since, labels, assignee)
 	}
 }
 
@@ -127,7 +127,7 @@ func fetchEvents(httpClient *http.Client, owner string, repo string, page int) (
 	return events, err
 }
 
-func printEvents(events []github.IssueEvent, since time.Time, labels []string, user string) bool {
+func printEvents(events []github.IssueEvent, since time.Time, labels []string, assignee string) bool {
 	for _, event := range events {
 		// events are ordered by created at desc. stop if got all we wanted.
 		if event.CreatedAt.Before(since) {
@@ -139,7 +139,7 @@ func printEvents(events []github.IssueEvent, since time.Time, labels []string, u
 			continue
 		}
 
-		if len(user) > 0 && (event.Issue.Assignee == nil || user != *event.Issue.Assignee.Login) {
+		if len(assignee) > 0 && (event.Issue.Assignee == nil || assignee != *event.Issue.Assignee.Login) {
 			continue
 		}
 
