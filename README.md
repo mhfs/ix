@@ -51,7 +51,7 @@ GLOBAL OPTIONS:
    --version, -v	print the version
 ```
 
-### `closed`
+#### closed
 
 ```
 NAME:
