@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"code.google.com/p/goauth2/oauth"
@@ -65,15 +64,20 @@ func main() {
 }
 
 func closedCommand(ctx *cli.Context) {
-	repo := ctx.String("repo")
+	repoPath := ctx.String("repo")
 	assignee := ctx.String("assignee")
 	labels := ctx.StringSlice("label")
 	token := ctx.String("token")
+	since, err := time.ParseInLocation(dateFormat, ctx.String("since"), time.Local)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
-	if repo == "" {
-		fmt.Print("\nMissing required flag --repo. Check usage below.\n\n")
-		cli.ShowCommandHelp(ctx, ctx.Command.Name)
-		return
+	repo, err := NewRepoFromPath(repoPath)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	t := &oauth.Transport{
@@ -81,90 +85,75 @@ func closedCommand(ctx *cli.Context) {
 	}
 	client := t.Client()
 
-	since, err := time.ParseInLocation(dateFormat, ctx.String("since"), time.Local)
-	if err != nil {
-		panic("invalid date provided")
-	}
-
-	fmt.Printf("Analyzing repo '%s' since '%s'\n\n", repo, since.Format(dateFormat))
-
-	parts := strings.Split(repo, "/")
-	owner, repo := parts[0], parts[1]
+	fmt.Printf("Analyzing repo '%s' since '%s'\n\n", repo.String(), since.Format(dateFormat))
 
 	var done bool
+	var issues []Issue
+
 	for page := 1; !done; page++ {
-		events, err := fetchEvents(client, owner, repo, page)
+		issues, done = fetchIssuesFromEvents(client, repo, since, "closed", page)
 
 		if err != nil {
 			fmt.Printf("Couldn't fetch issue from GitHub. Error: '%s'\n", err)
 			os.Exit(1)
 		}
 
-		done = printEvents(events, since, labels, assignee)
+		for _, issue := range issues {
+			// do not show if issue is not closed
+			if issue.State != "closed" {
+				continue
+			}
+
+			if len(assignee) > 0 && issue.Assignee != assignee {
+				continue
+			}
+
+			// if label filtering set, skip labels we're not interested at
+			if len(labels) > 0 && !issue.MatchLabels(labels) {
+				continue
+			}
+
+			fmt.Println(issue.String())
+		}
 	}
 }
 
-func fetchEvents(httpClient *http.Client, owner string, repo string, page int) ([]github.IssueEvent, error) {
-	client := github.NewClient(httpClient)
+func fetchEvents(client *http.Client, repo Repo, page int) []github.IssueEvent {
+	gh := github.NewClient(client)
 
 	options := github.ListOptions{Page: page, PerPage: 100}
-	events, _, err := client.Issues.ListRepositoryEvents(owner, repo, &options)
+	events, _, err := gh.Issues.ListRepositoryEvents(repo.Owner, repo.Name, &options)
 
-	return events, err
+	if err != nil {
+		fmt.Printf("Couldn't fetch events from GitHub. Error: '%s'\n", err)
+		os.Exit(1)
+	}
+
+	return events
 }
 
-func printEvents(events []github.IssueEvent, since time.Time, labels []string, assignee string) bool {
+func fetchIssuesFromEvents(httpClient *http.Client, repo Repo, since time.Time, event string, page int) ([]Issue, bool) {
+	done := false
+	events := fetchEvents(httpClient, repo, page)
+
+	var issues []Issue
 	for _, event := range events {
 		// events are ordered by created at desc. stop if got all we wanted.
 		if event.CreatedAt.Before(since) {
-			return true
+			done = true
+			break
 		}
 
-		// if event is closed or issue didn't remain closed
-		if *event.Event != "closed" || *event.Issue.State != "closed" {
+		// filter by desired state
+		if *event.Event != "closed" {
 			continue
 		}
 
-		if len(assignee) > 0 && (event.Issue.Assignee == nil || assignee != *event.Issue.Assignee.Login) {
-			continue
-		}
-
-		// if label filtering set, skip labels we're not interested at
-		if len(labels) > 0 {
-			if !matchingLabels(event.Issue.Labels, labels) {
-				continue
-			}
-		}
-
-		printEvent(&event)
+		issue := newIssueFromEvent(&event)
+		issues = append(issues, issue)
 	}
 
-	return false
-}
-
-func printEvent(event *github.IssueEvent) {
-	number := event.Issue.Number
-	closedAt := event.Issue.ClosedAt.In(time.Local).Format(dateFormat)
-	title := event.Issue.Title
-
-	var assignee string
-	if event.Issue.Assignee != nil {
-		assignee = " by @" + *event.Issue.Assignee.Login
-	}
-
-	var labelsNames []string
-	if labels := event.Issue.Labels; len(labels) > 0 {
-		for _, l := range labels {
-			labelsNames = append(labelsNames, *l.Name)
-		}
-	}
-	labelsString := strings.Join(labelsNames, ", ")
-
-	if len(labelsString) > 0 {
-		labelsString = " (" + labelsString + ")"
-	}
-
-	fmt.Printf("#%d - %s - %s%s%s\n", *number, closedAt, *title, assignee, labelsString)
+	return issues, done
 }
 
 func beginningOfWeek() time.Time {
@@ -178,15 +167,4 @@ func beginningOfWeek() time.Time {
 	beginningOfWeek := beginningOfDay.Add(-time.Duration(now.Weekday()) * 24 * time.Hour)
 
 	return beginningOfWeek
-}
-
-func matchingLabels(issueLabels []github.Label, targetLabels []string) bool {
-	for _, issueLabel := range issueLabels {
-		for _, targetLabel := range targetLabels {
-			if *issueLabel.Name == targetLabel {
-				return true
-			}
-		}
-	}
-	return false
 }
